@@ -1,0 +1,11 @@
+{
+    "python.pythonPath": "/Users/rhua966/Desktop/web-project/api/.venv/bin/python3",
+    "python.autoComplete.extraPaths": [
+        "./**",
+    ],
+    "python.languageServer": "Microsoft",
+    "python.envFile": "${workspaceFolder}/.venv",
+    "emmet.includeLanguages": {
+        "javascript": "javascriptreact"
+    }
+}
