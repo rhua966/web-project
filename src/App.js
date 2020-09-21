@@ -16,6 +16,7 @@ function App() {
   ])
 
   // Load the function once only when page loads, since [] never changes
+  // onMount
   useEffect(() => {
     const storedTodos = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY))
     if (storedTodos) setTodos(storedTodos)
