@@ -21,8 +21,9 @@ __pycache__
 .env.test.local
 .env.production.local
 .venv
-
+.vscode
 
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.vscode/settings.json
