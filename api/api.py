@@ -2,16 +2,14 @@ import time, uuid, sys, os, hashlib
 import sqlite3
 from flask import Flask, send_file, g, request
 from flask_restful import Api, Resource, reqparse, abort, fields, marshal_with
+from flask_httpauth import HTTPTokenAuth
 # from flask_sqlalchemy import SQLAlchemy
 
 DATA_ROOT = os.path.dirname(os.path.abspath(__file__)) + "/Data"
 
 app = Flask(__name__)
 api = Api(app)
-
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
-# app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-# db = SQLAlchemy(app)
+auth = HTTPTokenAuth(scheme="Digest", realm="Dairy")
 
 # Connection to the database
 def get_db():
@@ -20,69 +18,6 @@ def get_db():
         db = g._database = sqlite3.connect(DATA_ROOT + "/Data.db")
     return db
 
-
-
-# class VideoModel(db.Model):
-#     # Define all the fields of the database
-
-#     id = db.Column(db.Integer, primary_key=True)
-#     name = db.Column(db.String(100), nullable=False)
-#     views = db.Column(db.Integer, nullable=False)
-#     likes = db.Column(db.Integer, nullable=False)
-
-#     def __repr__(self):
-#         return f"Video(name = {name}, views = {views}, likes = {likes}"
-
-# db.create_all() # Only uncomment this line on the first you run it, otherwise data will be replaced everytime server runs 
-
-# video_put_args = reqparse.RequestParser()
-# video_put_args.add_argument("name", type=str, help="Name of the video is required", required=True)
-# video_put_args.add_argument("views", type=int, help="Views of the video is required")
-# video_put_args.add_argument("likes", type=int, help="Likes of the video is required")
-# # videos = {}
-
-# def abort_if_video_doesnt_exist(video_id):
-#     if video_id not in videos:
-#         abort(404, message="Video id is not valid...")
-
-# def abort_if_video_exist(video_id):
-#     if video_id in videos:
-#         abort(409, message="Video with that ID already exists")
-
-# resouce_fields = {
-#     'id': fields.Integer,
-#     'name': fields.String,
-#     'views': fields.Integer,
-#     'likes': fields.Integer
-# }
-
-# class Video(Resource):
-
-#     @marshal_with(resouce_fields)
-#     def get(self, video_id):
-#         result = VideoModel.query.filter_by(id=video_id).first()
-#         if not result:
-#             abort(404, message="Could not find video with that ID...")
-
-#         # Serizelize result using resource_fields
-#         return result
-
-#     @marshal_with(resouce_fields)
-#     def put(self, video_id):
-#         args = video_put_args.parse_args()
-#         result = VideoModel.query.filter_by(id=video_id).first()
-#         if result:
-#             abort(409, message='Video id taken...')
-#         video = VideoModel(id=video_id, name=args['name'], views=args['views'], likes=args['likes'])
-#         db.session.add(video)
-#         db.session.commit()
-#         return video, 201
-
-
-    # def delete(self, video_id):
-    #     abort_if_video_doesnt_exist(video_id)
-    #     del videos[video_id]
-    #     return "", 204
 class Items(Resource):
     def get(self):
 
@@ -102,6 +37,34 @@ class ItemImages(Resource):
             return send_file(path, "image/jpeg")
         else:
             return send_file(DATA_ROOT + f"/Images/Default.png", "image/png")
+post_comment_args = reqparse.RequestParser()
+post_comment_args.add_argument("Name", str)
+post_comment_args.add_argument("Comment", str)
+
+class Comment(Resource):
+
+    def get(self):
+        db = get_db()
+        with db:
+            cur = db.cursor()
+            cur.execute("SELECT * FROM Comments;")
+            r = [dict((cur.description[i][0], value) for i, value in enumerate(row)) for row in cur.fetchall()] 
+        return r, 200
+
+    def post(self):
+        args = post_comment_args.parse_args()
+        name = args['Name']
+        comment = args['Comment']
+
+        db = get_db()
+        with db:
+            cur = db.cursor()
+            cur.execute("INSERT INTO Comments (Name, Comment) VALUES (?, ?);", (name, comment))
+
+        return f"Comment ({comment}) posted from user ({name}).", 201
+        # return "Comment Submitted", 201
+
+
 
 post_args_parser = reqparse.RequestParser()
 post_args_parser.add_argument("Username", str)
@@ -129,6 +92,23 @@ class Register(Resource):
                 return f"User {username} already exists, please try another one.", 404
 
         # cur.close()
+users = {
+    "Kyle": "1",
+    "Huang": "2"
+}
+
+
+class Login(Resource):
+
+    @auth.get_password
+    def get_pwd(self, username):
+        if username in users:
+            return users.get(username)
+        return None
+
+    @auth.login_required
+    def get(self):
+        return f"Hello, {auth.username()}!"
 
 class Version(Resource):
     def get(self):
@@ -142,24 +122,27 @@ class VCard(Resource):
     def get(self):
         return send_file(DATA_ROOT + "/contact.vcf", "text/x-vcard")
 
-# api.add_resource(Video, "/video/<int:video_id>")
-api.add_resource(Items, "/items")
-api.add_resource(ItemImages, "/itemimg")
-api.add_resource(Register, "/register")
-api.add_resource(Version, "/version")
-api.add_resource(ID, "/id")
-api.add_resource(VCard, "/vcard")
+api.add_resource(Items, "/api/items")
+api.add_resource(ItemImages, "/api/itemimg")
+api.add_resource(Comment, "/api/comment")
+api.add_resource(Register, "/api/register")
+api.add_resource(Login, "/api/login")
+api.add_resource(Version, "/api/version")
+api.add_resource(ID, "/api/id")
+api.add_resource(VCard, "/api/vcard")
 
 
 if __name__ == "__main__":
     app.run(debug=True)
 
+@app.route('/api/')
+def index():
+    return "Flask is running!"
 
-
-@app.route('/time')
+@app.route('/api/time')
 def get_current_time():
     return {'time': time.time()}
 
-@app.route('/hello/<string:username>')
+@app.route('/api/hello/<string:username>')
 def hello(username):
     return f"Hello {username}, thanks for using Flask!"
