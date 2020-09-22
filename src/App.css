@@ -1,0 +1,30 @@
+body {
+    /* padding-top: 70px; */
+}
+
+.sticky-navbar {
+    position: fixed;
+    top: 0;
+}
+
+.card-grid {
+    display: grid;
+    align-items: center;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+@media all and (min-width: 480px) {
+    .Login {
+      padding: 60px 0;
+    }
+  
+    .Login form {
+      margin: 0 auto;
+      max-width: 320px;
+    }
+    /* .Login a {
+      margin: 0 auto;
+      max-width: 320px;
+    } */
+  }
