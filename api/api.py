@@ -1,4 +1,4 @@
-import time, uuid, sys, os
+import time, uuid, sys, os, hashlib
 import sqlite3
 from flask import Flask, send_file, g, request
 from flask_restful import Api, Resource, reqparse, abort, fields, marshal_with
@@ -13,17 +13,13 @@ api = Api(app)
 # app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # db = SQLAlchemy(app)
 
+# Connection to the database
 def get_db():
     db = getattr(g, '_database', None)
     if db is None:
         db = g._database = sqlite3.connect(DATA_ROOT + "/Data.db")
     return db
 
-@app.teardown_appcontext
-def close_connection(exception):
-    db = getattr(g, '_database', None)
-    if db is not None:
-        db.close()
 
 
 # class VideoModel(db.Model):
@@ -39,19 +35,19 @@ def close_connection(exception):
 
 # db.create_all() # Only uncomment this line on the first you run it, otherwise data will be replaced everytime server runs 
 
-video_put_args = reqparse.RequestParser()
-video_put_args.add_argument("name", type=str, help="Name of the video is required", required=True)
-video_put_args.add_argument("views", type=int, help="Views of the video is required")
-video_put_args.add_argument("likes", type=int, help="Likes of the video is required")
-# videos = {}
+# video_put_args = reqparse.RequestParser()
+# video_put_args.add_argument("name", type=str, help="Name of the video is required", required=True)
+# video_put_args.add_argument("views", type=int, help="Views of the video is required")
+# video_put_args.add_argument("likes", type=int, help="Likes of the video is required")
+# # videos = {}
 
-def abort_if_video_doesnt_exist(video_id):
-    if video_id not in videos:
-        abort(404, message="Video id is not valid...")
+# def abort_if_video_doesnt_exist(video_id):
+#     if video_id not in videos:
+#         abort(404, message="Video id is not valid...")
 
-def abort_if_video_exist(video_id):
-    if video_id in videos:
-        abort(409, message="Video with that ID already exists")
+# def abort_if_video_exist(video_id):
+#     if video_id in videos:
+#         abort(409, message="Video with that ID already exists")
 
 # resouce_fields = {
 #     'id': fields.Integer,
@@ -89,11 +85,13 @@ def abort_if_video_exist(video_id):
     #     return "", 204
 class Items(Resource):
     def get(self):
-        with app.app_context():
-            cur = get_db().cursor()
+
+        db = get_db()
+        with db:
+            cur = db.cursor()
             cur.execute("SELECT * FROM Items;")
             r = [dict((cur.description[i][0], value) for i, value in enumerate(row)) for row in cur.fetchall()]
-            return r
+        return r
 
 class ItemImages(Resource):
     def get(self):
@@ -105,14 +103,40 @@ class ItemImages(Resource):
         else:
             return send_file(DATA_ROOT + f"/Images/Default.png", "image/png")
 
+post_args_parser = reqparse.RequestParser()
+post_args_parser.add_argument("Username", str)
+post_args_parser.add_argument("Password", str)
+
+class Register(Resource):
+    
+    def post(self):
+        # print(request.data)
+        # json_data = request.get_json(force=True)
+        args = post_args_parser.parse_args()
+        username = args['Username']
+        password = args['Password']
+        hashed_password = hashlib.md5(f"{username}:{password}".encode()).hexdigest()
+        db = get_db()
+        with db:
+            cur = db.cursor()
+
+            if (cur.execute("SELECT * FROM 'Credentials' WHERE User = ?", [username]).fetchone() is None):
+                # Username available
+                cur.execute("INSERT INTO 'Credentials' (User, Password) VALUES (?, ?);", [username, hashed_password])
+                return f"User {username} registered.", 201
+            else:
+                # Username already exists
+                return f"User {username} already exists, please try another one.", 404
+
+        # cur.close()
 
 class Version(Resource):
     def get(self):
-        return "1.0.0"
+        return {"version": "1.0.0"}
 
 class ID(Resource):
     def get(self):
-        return str(uuid.uuid4())
+        return {"uuid": str(uuid.uuid4())}
 
 class VCard(Resource):
     def get(self):
@@ -121,6 +145,7 @@ class VCard(Resource):
 # api.add_resource(Video, "/video/<int:video_id>")
 api.add_resource(Items, "/items")
 api.add_resource(ItemImages, "/itemimg")
+api.add_resource(Register, "/register")
 api.add_resource(Version, "/version")
 api.add_resource(ID, "/id")
 api.add_resource(VCard, "/vcard")
